@@ -1,0 +1,6 @@
+2026-03-20 10:01:22 INFO User login successful from 192.168.1.10
+2026-03-20 10:02:01 WARNING Failed login from 203.0.113.7
+2026-03-20 10:03:45 ERROR Access denied for admin from 198.51.100.25
+2026-03-20 10:05:11 INFO Connection established to server
+2026-03-20 10:06:32 WARNING Failed login from 203.0.113.7
+2026-03-20 10:03:45 ERROR Access denied for admin from 156.24.130.15
