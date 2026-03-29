@@ -8,7 +8,7 @@ This script:
 - Listens on a local TCP port
 - Accepts incoming client connections
 - Connects to a target host and port
-- Forwards traffic between the client and target in both directions
+- Forwards traffic between the client and target in both directions using multithreading
 
 ## How It Works
 
@@ -38,7 +38,7 @@ py -m http.server 8000
 ### 2. Running the port forwarder
 
 ```bash
-py port_forwarder.py
+py port_forwarder.py --listen-port 9999 --target-host 127.0.0.1 --target-port 8000
 ```
 
 ### 3. Visiting in browser
@@ -51,23 +51,12 @@ http://127.0.0.1:9999
 
 ```text
 Listening on 127.0.0.1:9999
-Accepted connection from ('127.0.0.1', 50564)
+Accepted connection from ('127.0.0.1', 35761)
 Connected to remote target 127.0.0.1:8000
 Client -> Target: received 460 bytes
 Target -> Client: received 156 bytes
 Target -> Client: received 328 bytes
-Closed connection from ('127.0.0.1', 50564)
-```
-
-Browser may also request `/favicon.ico`, resulting in:
-
-```text
-Accepted connection from ('127.0.0.1', 50566)
-Connected to remote target 127.0.0.1:8000
-Client -> Target: received 470 bytes
-Target -> Client: received 186 bytes
-Target -> Client: received 335 bytes
-Closed connection from ('127.0.0.1', 50566)
+Closed connection from ('127.0.0.1', 35761)
 ```
 
 ## Skills Demonstrated
@@ -76,6 +65,7 @@ Closed connection from ('127.0.0.1', 50566)
 - TCP networking fundamentals
 - Multithreading
 - Bidirectional data forwarding
+- Command-line interface (argparse)
 - Network traffic inspection and debugging
 
 ## Project Evolution
@@ -84,6 +74,7 @@ This project was built step-by-step:
 - Basic single-request forwarder
 - Added multi-chunk response handling
 - Upgraded to threaded bidirectional forwarding
+- Added CLI argument support using argparse
 
 ## Notes
 
@@ -93,6 +84,5 @@ This project was built step-by-step:
 ## Future Improvements
 
 - Error handling
-- Command-line arguments
 - Logging system
 - Support for multiple targets
