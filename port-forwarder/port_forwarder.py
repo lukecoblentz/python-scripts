@@ -3,12 +3,22 @@
 # Import Socket
 import socket
 import threading
+import argparse
 
-LISTENING_HOST = '127.0.0.1'
-LISTENING_PORT = 9999
+parser = argparse.ArgumentParser(description='TCP Port Forwarder')
+parser.add_argument("--listen-host", default="127.0.0.1")
+parser.add_argument("--listen-port", type=int, required=True)
 
-TARGET_HOST = '127.0.0.1'
-TARGET_PORT = 8000
+parser.add_argument("--target-host", required=True)
+parser.add_argument("--target-port", type=int, required=True)
+
+args = parser.parse_args()
+
+LISTENING_HOST = args.listen_host
+LISTENING_PORT = args.listen_port
+
+TARGET_HOST = args.target_host
+TARGET_PORT = args.target_port
 
 def relay(source, destination, direction):
     while True:
