@@ -1,0 +1,6 @@
+# Generated chart (default --chart-out)
+log_analysis.png
+
+# Python
+__pycache__/
+*.py[cod]
