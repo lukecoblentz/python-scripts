@@ -1,6 +1,10 @@
 # Generated chart (default --chart-out)
 log_analysis.png
 
+# Optional export outputs
+report.json
+report.csv
+
 # Python
 __pycache__/
 *.py[cod]

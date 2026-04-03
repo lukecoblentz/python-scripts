@@ -2,7 +2,7 @@
 
 ## Overview
 
-A small Python tool that reads text logs, flags security-relevant lines (failed logins, errors, warnings, denials), aggregates IPs and timestamps, applies simple **statistical checks** (spikes, z-scores, rare lines, threshold alerts), and optionally saves a **matplotlib** chart of activity over time.
+A small Python tool that reads text logs, flags security-relevant lines (failed logins, errors, warnings, denials), aggregates IPs and timestamps, applies simple **statistical checks** (spikes, z-scores, rare lines, threshold alerts), optionally saves a **matplotlib** chart of activity over time, and can **export** results to JSON or CSV.
 
 ---
 
@@ -17,9 +17,9 @@ Application and system logs are often the first place you see brute-force attemp
 1. **Read** a log file (UTF-8, with replacement for invalid bytes).
 2. **Classify** each line with a fixed keyword priority: `failed` → `error` → `warning` → `denied` (first match wins; same idea as a simple `if/elif` chain).
 3. **Parse** a leading timestamp `YYYY-MM-DD HH:MM:SS` when present and bucket suspicious events **per minute**.
-4. **Extract** IPv4 addresses from suspicious lines and count them with `collections.Counter`.
-5. **Report** summaries, time buckets, top IPs, then **anomaly-style** checks: per-minute spikes vs. the file’s average, duplicate-line “rarity,” z-score on minute totals, and optional fixed thresholds (e.g. many failed events or many distinct IPs).
-6. **Optionally** write a bar chart of suspicious events per minute to a PNG file.
+4. **Extract** IPv4 addresses from suspicious lines and count them with `collections.Counter`; track **failed-login lines per IP** separately for brute-force-style alerts.
+5. **Report** summaries, time buckets, top IPs, then **anomaly-style** checks: per-minute spikes vs. the file’s average, duplicate-line “rarity,” z-score on minute totals, and fixed thresholds (total failed lines, many distinct IPs, **many failed lines from one IP**).
+6. **Optionally** write a bar chart of suspicious events per minute to a PNG file, and/or **JSON** / **CSV** exports for dashboards or tickets.
 
 ---
 
@@ -37,9 +37,10 @@ Application and system logs are often the first place you see brute-force attemp
 - Per-category counts and total suspicious line count
 - IP extraction and **top IPs** (sorted by frequency)
 - **Time buckets**: suspicious events per minute (when timestamps parse)
-- **Anomaly-style helpers**: spike detection vs. mean, z-score on minute counts, “rare” exact duplicate lines among suspicious entries, threshold alerts (tunable constants in `log_analyzer.py`)
+- **Anomaly-style helpers**: spike detection vs. mean, z-score on minute counts, “rare” exact duplicate lines among suspicious entries, threshold alerts (tunable constants in `log_analyzer.py`), including **per-IP failed-login counts** vs. a threshold
 - Optional **PNG chart** (`log_analysis.png` by default)
-- CLI: log path, `--no-chart`, `--chart-out`
+- Optional **JSON** (full report) and **CSV** (per-IP suspicious vs. failed counts) export
+- CLI: log path, `--no-chart`, `--chart-out`, `--export-json`, `--export-csv`
 
 ---
 
@@ -58,12 +59,14 @@ The script runs without matplotlib; chart output is skipped with a short message
 ## Usage
 
 ```text
-python log_analyzer.py [LOG_FILE] [--no-chart] [--chart-out PATH]
+python log_analyzer.py [LOG_FILE] [--no-chart] [--chart-out PATH] [--export-json PATH] [--export-csv PATH]
 ```
 
 - **`LOG_FILE`** — Path to the log file. If omitted, defaults to `sample.log`.
 - **`--no-chart`** — Do not write a matplotlib PNG.
 - **`--chart-out`** — Output path for the chart (default: `log_analysis.png`).
+- **`--export-json`** — Write a JSON report (summary, IPs, time buckets, anomaly summary, alerts).
+- **`--export-csv`** — Write a CSV with columns `ip`, `suspicious_line_count`, `failed_login_line_count`.
 
 Examples:
 
@@ -71,6 +74,7 @@ Examples:
 python log_analyzer.py sample.log
 python log_analyzer.py C:\logs\app.log --chart-out reports\activity.png
 python log_analyzer.py sample.log --no-chart
+python log_analyzer.py sample.log --export-json report.json --export-csv report.csv
 ```
 
 ---
@@ -104,6 +108,9 @@ Total suspicious lines: 4
   198.51.100.25 -> 1
   156.24.130.15 -> 1
 
+=== Failed-login lines by IP ===
+  203.0.113.7 -> 2
+
 === Time buckets (suspicious events per minute) ===
   2026-03-20 10:02 -> 1
   2026-03-20 10:03 -> 2
@@ -125,6 +132,8 @@ Total suspicious lines: 4
   (no threshold alerts triggered)
 ```
 
+With `--export-json` / `--export-csv`, an **Export** section lists the paths written (not shown above).
+
 ---
 
 ## Project Structure
@@ -134,6 +143,7 @@ log-analyzer/
 ├── log_analyzer.py
 ├── sample.log
 ├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
@@ -146,13 +156,14 @@ log-analyzer/
 - Regular expressions and light time-series aggregation
 - Exploratory “anomaly” signals without ML (thresholds + basic statistics)
 - Optional visualization with matplotlib
+- JSON/CSV export for reuse in spreadsheets or dashboards
 
 ---
 
 ## Future Improvements
 
-- Export summaries to **CSV/JSON** for dashboards or tickets
-- **Structured log formats** (JSON lines, syslog) with field parsers
+- **Structured log formats** (JSON lines, syslog) with field parsers instead of substring keywords
+- **Severity scoring** (numeric ranks per event type or message class)
 - Stricter IP validation and extraction from more patterns
 - **Machine learning**: learn normal per-hour baselines from history, sequence models for log lines, or clustering/template extraction (e.g. Drain-like) for rarer template-level anomalies
 - Config file or env vars for thresholds instead of constants in code
