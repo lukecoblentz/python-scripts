@@ -2,7 +2,7 @@
 
 ## Overview
 
-A small Python tool that reads text logs, flags security-relevant lines (failed logins, errors, warnings, denials), aggregates IPs and timestamps, applies simple **statistical checks** (spikes, z-scores, rare lines, threshold alerts), optionally saves a **matplotlib** chart of activity over time, and can **export** results to JSON or CSV.
+A small Python tool that reads text logs, flags security-relevant lines (failed logins, errors, warnings, denials), aggregates IPs and timestamps, applies simple **statistical checks** (spikes, z-scores, rare lines, threshold alerts), optionally saves a **matplotlib** chart, **exports** JSON/CSV, and—when you want a research-style upgrade—runs **Isolation Forest** and **moving-average volume** checks in separate modules (`line_features.py`, `ml_anomaly.py`).
 
 ---
 
@@ -20,6 +20,7 @@ Application and system logs are often the first place you see brute-force attemp
 4. **Extract** IPv4 addresses from suspicious lines and count them with `collections.Counter`; track **failed-login lines per IP** separately for brute-force-style alerts.
 5. **Report** summaries, time buckets, top IPs, then **anomaly-style** checks: per-minute spikes vs. the file’s average, duplicate-line “rarity,” z-score on minute totals, and fixed thresholds (total failed lines, many distinct IPs, **many failed lines from one IP**).
 6. **Optionally** write a bar chart of suspicious events per minute to a PNG file, and/or **JSON** / **CSV** exports for dashboards or tickets.
+7. **Optional ML mode (`--ml`)**: build a numeric feature vector per line (time-of-day, log level, length, IP count, keyword flags), **train** an `IsolationForest` on a **baseline** log (or unsupervised on the same file), **score** the target log, and compare **all-line volume per minute** to a trailing **moving average** (baseline-style drift in traffic).
 
 ---
 
@@ -27,7 +28,7 @@ Application and system logs are often the first place you see brute-force attemp
 
 - Python 3.10+ (uses `datetime | None` style types; adjust if you need older Python)
 - `argparse`, `re`, `collections.Counter`, `statistics`
-- Optional: `matplotlib` (see [Dependencies](#dependencies))
+- Optional: `matplotlib`, `numpy`, `scikit-learn` (see [Dependencies](#dependencies))
 
 ---
 
@@ -40,19 +41,19 @@ Application and system logs are often the first place you see brute-force attemp
 - **Anomaly-style helpers**: spike detection vs. mean, z-score on minute counts, “rare” exact duplicate lines among suspicious entries, threshold alerts (tunable constants in `log_analyzer.py`), including **per-IP failed-login counts** vs. a threshold
 - Optional **PNG chart** (`log_analysis.png` by default)
 - Optional **JSON** (full report) and **CSV** (per-IP suspicious vs. failed counts) export
-- CLI: log path, `--no-chart`, `--chart-out`, `--export-json`, `--export-csv`
+- **Modular ML**: `line_features.py` (feature extraction), `ml_anomaly.py` (Isolation Forest + moving-average volume anomalies)
+- CLI: log path, `--no-chart`, `--chart-out`, `--export-json`, `--export-csv`, **`--ml`**, **`--baseline`**, **`--ml-contamination`**
 
 ---
 
 ## Dependencies
 
-Install optional chart support:
-
 ```text
 pip install -r requirements.txt
 ```
 
-The script runs without matplotlib; chart output is skipped with a short message if it is not installed.
+- **matplotlib** — chart (skipped if missing).
+- **numpy** / **scikit-learn** — only needed for `--ml` (clear message if missing).
 
 ---
 
@@ -60,6 +61,7 @@ The script runs without matplotlib; chart output is skipped with a short message
 
 ```text
 python log_analyzer.py [LOG_FILE] [--no-chart] [--chart-out PATH] [--export-json PATH] [--export-csv PATH]
+  [--ml] [--baseline FILE] [--ml-contamination FLOAT]
 ```
 
 - **`LOG_FILE`** — Path to the log file. If omitted, defaults to `sample.log`.
@@ -67,6 +69,9 @@ python log_analyzer.py [LOG_FILE] [--no-chart] [--chart-out PATH] [--export-json
 - **`--chart-out`** — Output path for the chart (default: `log_analysis.png`).
 - **`--export-json`** — Write a JSON report (summary, IPs, time buckets, anomaly summary, alerts).
 - **`--export-csv`** — Write a CSV with columns `ip`, `suspicious_line_count`, `failed_login_line_count`.
+- **`--ml`** — Run Isolation Forest (line features) and moving-average volume checks (needs `numpy`, `scikit-learn`).
+- **`--baseline`** — Optional “normal” log used **only to train** the Isolation Forest; the main `LOG_FILE` is scored. If omitted, the forest trains on the **same** file (unsupervised; needs enough lines—at least five with parseable features).
+- **`--ml-contamination`** — Expected fraction of anomalies for the forest (default `0.08`, capped for sklearn).
 
 Examples:
 
@@ -75,6 +80,8 @@ python log_analyzer.py sample.log
 python log_analyzer.py C:\logs\app.log --chart-out reports\activity.png
 python log_analyzer.py sample.log --no-chart
 python log_analyzer.py sample.log --export-json report.json --export-csv report.csv
+python log_analyzer.py target.log --ml --baseline normal_week.log
+python log_analyzer.py sample.log --no-chart --ml
 ```
 
 ---
@@ -140,7 +147,9 @@ With `--export-json` / `--export-csv`, an **Export** section lists the paths wri
 
 ```text
 log-analyzer/
-├── log_analyzer.py
+├── log_analyzer.py      # CLI + rule-based analytics
+├── line_features.py     # Per-line numeric features for ML
+├── ml_anomaly.py        # Isolation Forest + moving-average volume
 ├── sample.log
 ├── requirements.txt
 ├── .gitignore
@@ -155,6 +164,7 @@ log-analyzer/
 - File I/O and structured reporting
 - Regular expressions and light time-series aggregation
 - Exploratory “anomaly” signals without ML (thresholds + basic statistics)
+- Optional **Isolation Forest** on engineered features and **moving-average** volume anomalies (with optional baseline log)
 - Optional visualization with matplotlib
 - JSON/CSV export for reuse in spreadsheets or dashboards
 
@@ -165,11 +175,12 @@ log-analyzer/
 - **Structured log formats** (JSON lines, syslog) with field parsers instead of substring keywords
 - **Severity scoring** (numeric ranks per event type or message class)
 - Stricter IP validation and extraction from more patterns
-- **Machine learning**: learn normal per-hour baselines from history, sequence models for log lines, or clustering/template extraction (e.g. Drain-like) for rarer template-level anomalies
+- **Richer ML**: learned embeddings, sequence models (LSTM/Transformer) on log lines, or template clustering (e.g. Drain) on top of the current feature pipeline
+- **Multi-file** batch analysis and rolling baselines over time
 - Config file or env vars for thresholds instead of constants in code
 
 ---
 
 ## Conclusion
 
-This project shows how far you can get with keyword rules, aggregation, and simple statistics on a single log file—and where a chart or later ML could plug in when volume and history justify it.
+The tool layers **rules and statistics** for transparency, **exports** for integration, and an optional **ML path** (baseline + Isolation Forest + volume MA) so you can describe both heuristic and learning-based anomaly detection in research write-ups (for example DREU).

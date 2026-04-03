@@ -1,6 +1,7 @@
 """
 Log analyzer: keyword-based events, IP aggregation, time buckets,
-simple spike/rare/threshold checks, optional matplotlib chart.
+spike/rare/threshold checks, optional matplotlib chart, JSON/CSV export,
+and optional ML (--ml: Isolation Forest + moving-average volume; see ml_anomaly.py).
 """
 
 from __future__ import annotations
@@ -59,6 +60,29 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         metavar="PATH",
         help="Write a CSV table: ip, suspicious_line_count, failed_line_count.",
+    )
+    p.add_argument(
+        "--ml",
+        action="store_true",
+        help=(
+            "Run ML-style checks: Isolation Forest on line features, "
+            "and per-minute volume vs moving average (requires scikit-learn, numpy)."
+        ),
+    )
+    p.add_argument(
+        "--baseline",
+        type=Path,
+        metavar="FILE",
+        help=(
+            "Normal/baseline log for training Isolation Forest (optional). "
+            "If omitted, the main log file is used for training (unsupervised)."
+        ),
+    )
+    p.add_argument(
+        "--ml-contamination",
+        type=float,
+        default=0.08,
+        help="Expected fraction of anomalies for Isolation Forest (default: 0.08).",
     )
     return p.parse_args()
 
@@ -242,6 +266,17 @@ def main() -> None:
             alerts.append(msg)
     if not alerts:
         print("  (no threshold alerts triggered)")
+
+    if args.ml:
+        from ml_anomaly import run_ml_report
+
+        baseline_lines: list[str] | None = None
+        if args.baseline is not None:
+            bp = args.baseline
+            if not bp.is_file():
+                raise SystemExit(f"Baseline file not found: {bp}")
+            baseline_lines = bp.read_text(encoding="utf-8", errors="replace").splitlines()
+        run_ml_report(lines, baseline_lines, args.ml_contamination)
 
     # --- Optional JSON / CSV export ---
     if args.export_json or args.export_csv:
